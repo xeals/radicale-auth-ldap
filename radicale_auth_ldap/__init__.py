@@ -42,11 +42,16 @@ class Auth(BaseAuth):
         ATTRIBUTE = self.configuration.get("auth", "ldap_attribute")
         FILTER = self.configuration.get("auth", "ldap_filter")
         BINDDN = self.configuration.get("auth", "ldap_binddn")
-        PASSWORD = self.configuration.get("auth", "ldap_password")
+        PASSWORD = self.configuration.get("auth", "ldap_password", fallback=None)
+        PASSWORD_FILE = self.configuration.get("auth", "ldap_password_file", fallback=None)
         SCOPE = self.configuration.get("auth", "ldap_scope")
         SUPPORT_EXTENDED = self.configuration.getboolean("auth", "ldap_support_extended", fallback=True)
-        
-        if BINDDN and PASSWORD:
+
+        if BINDDN and PASSWORD_FILE:
+            with open(PASSWORD_FILE) as f:
+                passwd = f.read()
+            conn = ldap3.Connection(SERVER, BINDDN, passwd)
+        elif BINDDN and PASSWORD:
             conn = ldap3.Connection(SERVER, BINDDN, PASSWORD)
         else:
             conn = ldap3.Connection(SERVER)
