@@ -19,7 +19,7 @@ class Authentication(unittest.TestCase):
 
     def test_authentication_works(self):
         auth = radicale_auth_ldap.Auth(self.__class__.configuration)
-        self.assertTrue(auth.is_authenticated(VALID_USER, VALID_PASS))
+        self.assertTrue(auth.login(VALID_USER, VALID_PASS))
 
 
 if __name__ == "__main__":

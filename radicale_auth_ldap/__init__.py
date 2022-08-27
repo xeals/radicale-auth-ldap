@@ -30,46 +30,62 @@ import ldap3
 import ldap3.core.exceptions
 
 from radicale.auth import BaseAuth
+from radicale.log import logger
 
 import radicale_auth_ldap.ldap3imports
 
 
+PLUGIN_CONFIG_SCHEMA = {"auth": {
+    "ldap_url": {"value": "", "type": str},
+    "ldap_base": {"value": "", "type": str},
+    "ldap_attribute": {"value": "", "type": str},
+    "ldap_filter": {"value": "", "type": str},
+    "ldap_binddn": {"value": "", "type": str},
+    "ldap_password": {"value": "", "type": str},
+    "ldap_password_file": {"value": "", "type": str},
+    "ldap_scope": {"value": "", "type": str},
+    "ldap_support_extended": {"value": "True", "type": bool}}}
+
+
 class Auth(BaseAuth):
-    def is_authenticated(self, user, password):
-        """Check if ``user``/``password`` couple is valid."""
+    def __init__(self, configuration):
+        super().__init__(configuration.copy(PLUGIN_CONFIG_SCHEMA))
+
+
+    def login(self, user: str, password: str) -> str:
         SERVER = ldap3.Server(self.configuration.get("auth", "ldap_url"))
         BASE = self.configuration.get("auth", "ldap_base")
         ATTRIBUTE = self.configuration.get("auth", "ldap_attribute")
         FILTER = self.configuration.get("auth", "ldap_filter")
         BINDDN = self.configuration.get("auth", "ldap_binddn")
-        PASSWORD = self.configuration.get("auth", "ldap_password", fallback=None)
-        PASSWORD_FILE = self.configuration.get("auth", "ldap_password_file", fallback=None)
-        SCOPE = self.configuration.get("auth", "ldap_scope")
-        SUPPORT_EXTENDED = self.configuration.getboolean("auth", "ldap_support_extended", fallback=True)
-
-        if BINDDN and PASSWORD_FILE:
+        PASSWORD_FILE = self.configuration.get("auth", "ldap_password_file")
+        if PASSWORD_FILE:
             with open(PASSWORD_FILE) as f:
-                passwd = f.read()
-            conn = ldap3.Connection(SERVER, BINDDN, passwd)
-        elif BINDDN and PASSWORD:
+                PASSWORD = f.read()
+        else:
+            PASSWORD = self.configuration.get("auth", "ldap_password")
+        SCOPE = self.configuration.get("auth", "ldap_scope")
+        SUPPORT_EXTENDED = self.configuration.get("auth", "ldap_support_extended")
+
+        if BINDDN and PASSWORD:
             conn = ldap3.Connection(SERVER, BINDDN, PASSWORD)
         else:
             conn = ldap3.Connection(SERVER)
         conn.bind()
 
         try:
-            self.logger.debug("LDAP whoami: %s" % conn.extend.standard.who_am_i())
+            logger.debug("LDAP whoami: %s" % conn.extend.standard.who_am_i())
         except Exception as err:
-            self.logger.debug("LDAP error: %s" % err)
+            logger.debug("LDAP error: %s" % err)
 
         distinguished_name = "%s=%s" % (ATTRIBUTE, ldap3imports.escape_attribute_value(user))
-        self.logger.debug("LDAP bind for %s in base %s" % (distinguished_name, BASE))
+        logger.debug("LDAP bind for %s in base %s" % (distinguished_name, BASE))
 
         if FILTER:
             filter_string = "(&(%s)%s)" % (distinguished_name, FILTER)
         else:
             filter_string = distinguished_name
-        self.logger.debug("LDAP filter: %s" % filter_string)
+        logger.debug("LDAP filter: %s" % filter_string)
 
         conn.search(search_base=BASE,
                     search_scope=SCOPE,
@@ -81,28 +97,28 @@ class Auth(BaseAuth):
         if users:
             user_dn = users[0]['dn']
             uid = users[0]['attributes'][ATTRIBUTE]
-            self.logger.debug("LDAP user %s (%s) found" % (uid, user_dn))
+            logger.debug("LDAP user %s (%s) found" % (uid, user_dn))
             try:
                 conn = ldap3.Connection(SERVER, user_dn, password)
                 conn.bind()
-                self.logger.debug(conn.result)
+                logger.debug(conn.result)
                 if SUPPORT_EXTENDED:
                     whoami = conn.extend.standard.who_am_i()
-                    self.logger.debug("LDAP whoami: %s" % whoami)
+                    logger.debug("LDAP whoami: %s" % whoami)
                 else:
-                    self.logger.debug("LDAP skip extended: call whoami")
+                    logger.debug("LDAP skip extended: call whoami")
                     whoami = conn.result['result'] == 0
                 if whoami:
-                    self.logger.debug("LDAP bind OK")
-                    return True
+                    logger.debug("LDAP bind OK")
+                    return user
                 else:
-                    self.logger.debug("LDAP bind failed")
-                    return False
+                    logger.debug("LDAP bind failed")
+                    return ""
             except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
-                self.logger.debug("LDAP invalid credentials")
+                logger.debug("LDAP invalid credentials")
             except Exception as err:
-                self.logger.debug("LDAP error %s" % err)
-            return False
+                logger.debug("LDAP error %s" % err)
+            return ""
         else:
-            self.logger.debug("LDAP user %s not found" % user)
-            return False
+            logger.debug("LDAP user %s not found" % user)
+            return ""

@@ -8,6 +8,7 @@ TEST_CONFIGURATION = {
         'ldap_filter': '(objectClass=person)',
         'ldap_binddn': 'cn=xxx,dc=xxx,dc=xx',
         'ldap_password': '',
+        'ldap_password_file': '',
         'ldap_scope': 'LEVEL'
     }
 }
