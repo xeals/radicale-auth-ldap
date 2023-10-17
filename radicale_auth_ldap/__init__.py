@@ -73,10 +73,14 @@ class Auth(BaseAuth):
             conn = ldap3.Connection(SERVER)
         conn.bind()
 
-        try:
-            logger.debug("LDAP whoami: %s" % conn.extend.standard.who_am_i())
-        except Exception as err:
-            logger.debug("LDAP error: %s" % err)
+        
+        if SUPPORT_EXTENDED:
+            try:
+                logger.debug("LDAP whoami: %s" % conn.extend.standard.who_am_i())
+            except Exception as err:
+                logger.debug("LDAP error: %s" % err)
+        else:
+            logger.debug("LDAP skip extended: call whoami")
 
         distinguished_name = "%s=%s" % (ATTRIBUTE, ldap3imports.escape_attribute_value(user))
         logger.debug("LDAP bind for %s in base %s" % (distinguished_name, BASE))
