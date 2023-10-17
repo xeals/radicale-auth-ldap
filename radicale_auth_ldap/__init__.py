@@ -121,7 +121,7 @@ class Auth(BaseAuth):
             except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
                 logger.debug("LDAP invalid credentials")
             except Exception as err:
-                logger.debug("LDAP error %s" % err)
+                logger.exception("LDAP error %s" % err)
             return ""
         else:
             logger.debug("LDAP user %s not found" % user)
